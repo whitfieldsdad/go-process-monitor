@@ -1,10 +1,12 @@
 # Process monitor
 
-⚠️ This project is under active development ⚠️
+## How it works
+
+- Lookup processes every 10 milliseconds and look for new ones
 
 ## Features
 
-- Track the creation of new processes on macOS without privileged access
+- Track the creation of new processes on Windows, Linux, and macOS without privileged access
 - JSONL output
 
 ## Usage
