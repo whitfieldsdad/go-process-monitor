@@ -17,5 +17,4 @@ jobs:
         with:
           fetch-depth: 1
       - name: Run Makefile
-        env:
         run: make build
