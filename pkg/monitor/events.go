@@ -45,3 +45,9 @@ func NewEvent(objectType ObjectType, eventType EventType, details interface{}) E
 		Data: details,
 	}
 }
+
+func NewProcessStartEvent(process Process) Event {
+	return NewEvent(ObjectTypeProcess, EventTypeStarted, ProcessStartEventData{
+		Process: process,
+	})
+}

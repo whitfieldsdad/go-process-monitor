@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/log"
 	lru "github.com/hashicorp/golang-lru"
+	ps "github.com/shirou/gopsutil/v3/process"
 )
 
 const (
@@ -18,9 +19,21 @@ func TrackProcesses(ctx context.Context, events chan Event) {
 		log.Fatalf("Failed to create LRU cache: %v", err)
 		return
 	}
-	listOpts := &ProcessOptions{
-		IncludeHashes: false,
+
+	processes, err := ps.Processes()
+	if err != nil {
+		log.Fatalf("Failed to list processes: %v", err)
+		return
 	}
+	for _, p := range processes {
+		ppid, err := p.PpidWithContext(ctx)
+		if err != nil {
+			continue
+		}
+		h := calculateProcessId(p.Pid, ppid)
+		seen.Add(h, nil)
+	}
+
 	ids, err := ListProcessIdentities()
 	if err != nil {
 		log.Fatalf("Failed to list processes: %v", err)
@@ -36,32 +49,31 @@ func TrackProcesses(ctx context.Context, events chan Event) {
 	for {
 		select {
 		case <-ticker.C:
-			ids, err := ListProcessIdentities()
+			processes, err := ps.Processes()
 			if err != nil {
 				log.Fatalf("Failed to list processes: %v", err)
-				return
+				continue
 			}
-			for _, id := range ids {
-				h := id.Hash()
+			for _, p := range processes {
+				ppid, err := p.PpidWithContext(ctx)
+				if err != nil {
+					continue
+				}
+				h := calculateProcessId(p.Pid, ppid)
 				_, ok := seen.Get(h)
 				if !ok {
-					seen.Add(h, id)
+					seen.Add(h, nil)
 
-					var process *Process
-					process, err = GetProcess(id.PID, listOpts)
+					process, err := GetProcess(p.Pid, nil)
 					if err != nil {
-						log.Warnf("A new process was detected, but we weren't fast enough to get its details: %v (PID: %d, PPID: %d)", err, id.PID, id.PPID)
-						process = &Process{
-							PID:  id.PID,
-							PPID: id.PPID,
-						}
+						log.Errorf("Failed to get process: %v", err)
+						continue
 					}
-					details := ProcessStartEventData{
-						Process: *process,
-					}
-					events <- NewEvent(ObjectTypeProcess, EventTypeStarted, details)
+					log.Debugf("New process detected (PID: %d, PPID: %d, name: %s)", process.PID, process.PPID, process.Name)
+					events <- NewProcessStartEvent(*process)
 				}
 			}
+
 		case <-ctx.Done():
 			return
 		}

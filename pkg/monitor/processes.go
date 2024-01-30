@@ -96,6 +96,25 @@ func (p ProcessIdentity) Hash() uint64 {
 	return calculateProcessId(p.PID, p.PPID)
 }
 
+func ListProcessIdentities() ([]ProcessIdentity, error) {
+	processes, err := ps.Processes()
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]ProcessIdentity, len(processes))
+	for i, p := range processes {
+		ppid, err := p.Ppid()
+		if err != nil {
+			continue
+		}
+		ids[i] = ProcessIdentity{
+			PID:  p.Pid,
+			PPID: ppid,
+		}
+	}
+	return ids, nil
+}
+
 func calculateProcessId(pid, ppid int32) uint64 {
 	k := []byte(fmt.Sprintf("%d,%d", pid, ppid))
 	return xxh3.Hash(k)
